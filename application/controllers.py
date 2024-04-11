@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from aiohttp.web import json_response
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 
 from application import models
 
@@ -26,7 +26,6 @@ async def get_price(request):
 
 async def get_statistics(request):
     """Retrieves price history data from the database with pagination."""
-
     page_param = request.query.get('page')
 
     try:
@@ -37,6 +36,11 @@ async def get_statistics(request):
         return json_response(text="Invalid page parameter", status=400)
 
     async with request.app['db'].acquire() as conn:
+        total_count_query = select(func.count()).select_from(models.statistics)
+        total_count = await conn.fetchval(total_count_query)
+
+        total_pages = (total_count + 9) // 10
+
         offset = (page - 1) * 10
         query = select(models.statistics.c.id, models.statistics.c.currency,
                        models.statistics.c.date_, models.statistics.c.price).limit(10).offset(offset)
@@ -52,7 +56,13 @@ async def get_statistics(request):
         for row in result
     ]
 
-    return json_response(data)
+    return json_response({
+        "data": data,
+        "pagination": {
+            "current_page": page,
+            "total_pages": total_pages,
+        }
+    })
 
 
 async def delete_statistics(request):

@@ -3,9 +3,11 @@ import os
 import asyncpgsa
 from aiohttp import web
 from ccxt import kucoin
+from dotenv import load_dotenv
 
 from application.controllers import get_price, get_statistics, delete_statistics
 
+load_dotenv()
 username = os.environ.get('SQL_USER')
 password = os.environ.get('SQL_PASSWORD')
 db_name = os.environ.get('SQL_DB')
