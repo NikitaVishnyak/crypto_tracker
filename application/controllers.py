@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from aiohttp.web import json_response
+from ccxt import BadSymbol
 from sqlalchemy import select, delete, func
 
 from application import models
@@ -12,16 +13,23 @@ async def get_price(request):
     if currency == 'history':
         return await get_statistics(request)
     else:
-        exchange = request.app['exchange']
+        try:
+            exchange = request.app['exchange']
 
-        ticker = exchange.fetch_ticker(f'{currency}/USDT')
-        price = ticker['bid']
+            ticker = exchange.fetch_ticker(f'{currency}/USDT')
+            price = ticker['bid']
 
-        async with request.app['db'].acquire() as conn:
-            query = "INSERT INTO statistics (currency, price, date_) VALUES ($1, $2, $3)"
-            await conn.execute(query, currency, price, datetime.utcnow())
+            timestamp = datetime.utcnow().replace(microsecond=0)
 
-        return json_response(text=f'Price for {currency} is {price} USDT.')
+            async with request.app['db'].acquire() as conn:
+                query = "INSERT INTO statistics (currency, price, date_) VALUES ($1, $2, $3)"
+                await conn.execute(query, currency, price, timestamp)
+
+            return json_response(text=f'Price for {currency} is {price} USDT.')
+        except BadSymbol:
+            return json_response(text=f"Currency '{currency}' not found.", status=400)
+        except Exception:
+            return json_response(text="Internal server error", status=500)
 
 
 async def get_statistics(request):
